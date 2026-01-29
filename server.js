@@ -1,40 +1,24 @@
-const express = require("express");
-const cors = require("cors");
-const app = express();
+const express = require("express")
+const app = express()
+app.use(express.json())
 
-app.use(cors());
-app.use(express.json());
+let users = {}
 
-const users = {};
-
-function getUser(id){
-if(!users[id]){
-users[id]={id,score:0,power:1,lastTap:0};
-}
-return users[id];
-}
-
-app.get("/state",(req,res)=>{
-const u=getUser(req.query.id);
-res.json(u);
-});
-
-app.post("/tap",(req,res)=>{
-const u=getUser(req.body.id);
-const now=Date.now();
-if(now-u.lastTap<100) return res.json(u); // античит
-u.lastTap=now;
-u.score+=u.power;
-res.json(u);
-});
+app.post("/tap", (req,res)=>{
+  const {id,count}=req.body
+  if(!users[id]) users[id]={coins:0,last:Date.now()}
+  const now=Date.now()
+  if(now-users[id].last<80) return res.status(403).send("cheat")
+  users[id].coins+=count
+  users[id].last=now
+  res.json({coins:users[id].coins})
+})
 
 app.get("/leaderboard",(req,res)=>{
-res.json(
-Object.values(users)
-.sort((a,b)=>b.score-a.score)
-.slice(0,10)
-);
-});
+  const top=Object.entries(users)
+    .sort((a,b)=>b[1].coins-a[1].coins)
+    .slice(0,10)
+  res.json(top)
+})
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT,()=>console.log("Server running"));
+app.listen(3000,()=>console.log("SERVER OK"))

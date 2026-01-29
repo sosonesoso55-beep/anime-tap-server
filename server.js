@@ -1,38 +1,83 @@
-const express = require("express");
+import express from "express";
+import cors from "cors";
+
 const app = express();
-
-const PORT = process.env.PORT || 3000;
-
-// middleware
+app.use(cors());
 app.use(express.json());
 
-// test route
-app.get("/", (req, res) => {
-  res.send("🔥 Anime Tap Server работает!");
-});
+const PORT = process.env.PORT || 10000;
 
-// leaderboard example
-let leaderboard = [];
+/* ====== ХРАНИЛИЩЕ ====== */
+const users = {}; 
+/*
+users[userId] = {
+  score: 0,
+  multiplier: 1,
+  multEnd: 0
+}
+*/
 
-app.post("/score", (req, res) => {
-  const { user, score } = req.body;
+/* ====== ПОЛУЧИТЬ ПРОФИЛЬ ====== */
+app.get("/profile/:id", (req, res) => {
+  const id = req.params.id;
 
-  if (!user || typeof score !== "number") {
-    return res.status(400).json({ error: "Invalid data" });
+  if (!users[id]) {
+    users[id] = { score: 0, multiplier: 1, multEnd: 0 };
   }
 
-  leaderboard.push({ user, score });
-  leaderboard.sort((a, b) => b.score - a.score);
-  leaderboard = leaderboard.slice(0, 10);
-
-  res.json({ success: true });
+  res.json(users[id]);
 });
 
+/* ====== ТАП ====== */
+app.post("/tap", (req, res) => {
+  const { id } = req.body;
+
+  if (!users[id]) {
+    users[id] = { score: 0, multiplier: 1, multEnd: 0 };
+  }
+
+  const now = Date.now();
+  if (users[id].multEnd < now) {
+    users[id].multiplier = 1;
+  }
+
+  users[id].score += users[id].multiplier;
+  res.json(users[id]);
+});
+
+/* ====== МАГАЗИН ====== */
+app.post("/buy", (req, res) => {
+  const { id, type } = req.body;
+  const user = users[id];
+  if (!user) return res.status(400).json({ error: "no user" });
+
+  const now = Date.now();
+
+  if (type === "x2" && user.score >= 500) {
+    user.score -= 500;
+    user.multiplier = 2;
+    user.multEnd = now + 10 * 60 * 1000;
+  }
+
+  if (type === "x5" && user.score >= 3000) {
+    user.score -= 3000;
+    user.multiplier = 5;
+    user.multEnd = now + 10 * 60 * 1000;
+  }
+
+  res.json(user);
+});
+
+/* ====== ЛИДЕРБОРД ====== */
 app.get("/leaderboard", (req, res) => {
-  res.json(leaderboard);
+  const top = Object.entries(users)
+    .map(([id, u]) => ({ id, score: u.score }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+
+  res.json(top);
 });
 
-// START SERVER
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log("🔥 Anime Tap Server работает!");
 });
